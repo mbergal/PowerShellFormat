@@ -1,18 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Management.Automation;
 using System.Reflection;
-using System.Text;
 using NUnit.Framework;
 using NUnit.Framework.Constraints;
-using PowerShellFormat.Test.data;
 
 namespace PowerShellFormat.Test
 {
-
-    
     [TestFixture]
     public class TestPowerShellFormat
         {
@@ -20,7 +13,7 @@ namespace PowerShellFormat.Test
         public void ShouldFormatNumber()
             {
             Assert.That(
-                1.PowerShellFormat().ReadToEnd(), 
+                1.ToPS().ToString(), 
                 Is.EqualTo( LoadResource( "PowerShellFormat.Test.data.FormatNumber.txt" ) ) ); 
             }
 
@@ -29,7 +22,7 @@ namespace PowerShellFormat.Test
             {
             var array = new int[] { 1, 2, 3, 4 };
             Assert.That( 
-                array.PowerShellFormat().ReadToEnd(), 
+                array.ToPS().ToString(), 
                 Is.EqualTo( LoadResource( "PowerShellFormat.Test.data.FormatArray.txt") ) );
             }
 
@@ -38,7 +31,7 @@ namespace PowerShellFormat.Test
             {
             var simpleDictionary = new Dictionary<string, string>() { { "a", "v1" }, { "b", "v2" } };
             Assert.That(
-                simpleDictionary.PowerShellFormat( 15 ).ReadToEnd(),
+                simpleDictionary.ToPS().ToString( width: 15),
                 Is.EqualTo(LoadResource("PowerShellFormat.Test.data.FormatSimpleDictionary.txt")) );
             }
 
@@ -48,49 +41,42 @@ namespace PowerShellFormat.Test
             var array = new int[] { 1, 2, 3, 4 };
             var dictionaryOfArrays = new Dictionary<string, int[]>() { { "a", array }, { "b", array } };
             Assert.That( 
-                    dictionaryOfArrays.PowerShellFormat( 20 ).ReadToEnd(), 
-                    Is.EqualTo( LoadResource( "PowerShellFormat.Test.data.FormatDictionaryOfArrays.txt" ) ).NoClip );
+                    dictionaryOfArrays.ToPS().ToString( width: 30 ), 
+                    new IsEqualToContentOfResource( "FormatDictionaryOfArrays.txt" ) );
             }
 
         [Test]
-        public void ShouldFormatAccordingToSpecification()
+        public void ShouldFormatAccordingToCommands()
             {
             var array = new int[] { 1, 2, 3, 4 };
             var dictionaryOfArrays = new Dictionary<string, int[]>() { { "a", array }, { "b", array } };
             Assert.That( 
-                dictionaryOfArrays, 
-                new IsFormatted( to: "FormatDictionaryOfArrays.txt", @using: ps=>ps.AddCommand( "Format-Table").AddParameter( "AutoSize") ) );
+                dictionaryOfArrays.ToPS().FormatTable( AutoSize: true ).ToString(), 
+                 new IsEqualToContentOfResource( "FormatDictionaryOfArrays.txt" ) );
             }
 
-        class IsFormatted : Constraint
+        class IsEqualToContentOfResource : Constraint
             {
-            private string to;
-            private Action<PowerShell> @using;
+            private readonly string _resourceName;
             private string actualString;
             private string expectedString;
 
-            public IsFormatted( string to, Action<PowerShell> @using )
+            public IsEqualToContentOfResource(string resourceName)
                 {
-                this.to = to;
-                this.@using = @using;
+                this._resourceName = resourceName;
                 }
 
             public override bool Matches(object actual)
                 {
                 this.actual = actual;
-                this.actualString = actual.PowerShellFormat( this.@using ).ReadToEnd();
-                this.expectedString = LoadResource( "PowerShellFormat.Test.data." + this.to );
+                this.actualString = (string) actual;
+                this.expectedString = LoadResource( "PowerShellFormat.Test.data." + this._resourceName );
                 return this.actualString == this.expectedString;
                 }
 
             public override void WriteDescriptionTo( MessageWriter writer )
                 {
                 writer.WriteExpectedValue( this.expectedString );
-                }
-
-            public override void WriteMessageTo(MessageWriter writer)
-                {
-                base.WriteMessageTo( writer );
                 }
 
             public override void WriteActualValueTo(MessageWriter writer)

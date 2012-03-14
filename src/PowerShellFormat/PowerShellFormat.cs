@@ -11,29 +11,80 @@ namespace PowerShellFormat
     {
     public static class ObjectEx
         {
-        public static TextReader PowerShellFormat( this object obj, Action<PowerShell> block = null )
+        public static PowerShellPipeLine ToPS ( this object obj )
             {
-            return obj.PowerShellFormat( 120, block );
+            var ps = new PowerShellPipeLine { Input = obj };
+            return ps;
+            }
+        }
+
+    public class PowerShellPipeLine
+        {
+        public PSCommand commands = new PSCommand();
+        public object Input
+            {
+            get;
+            set;
             }
 
-        public static TextReader PowerShellFormat(this object obj, int? maxWidth, Action<PowerShell> block = null )
+        public PowerShellPipeLine   AddCommand( string command )
+            {
+            commands.AddCommand(command);
+            return this;
+            }
+
+        public PowerShellPipeLine   AddArgument( object arg )
+            {
+            commands.AddArgument(arg);
+            return this;
+            }
+
+        public PowerShellPipeLine   AddParameter( string parameterName, object value )
+            {
+            commands.AddParameter( parameterName: parameterName, value: value );
+            return this;
+            }
+
+        public PowerShellPipeLine AddParameter(string parameterName)
+            {
+            commands.AddParameter(parameterName: parameterName);
+            return this;
+            }
+
+        public new string ToString()
+            {
+            return this.ToString(width: null);
+            }
+
+        public string ToString( int? width )
             {
             DateTime s = DateTime.Now;
-            var h = new Host( maxWidth );
+            var h = new Host( width );
             using ( Runspace rs = RunspaceFactory.CreateRunspace( h ) )
             using ( PowerShell ps = PowerShell.Create() )
                 {
                 rs.Open();
                 ps.Runspace = rs;
-                if (block != null)
-                    block( ps );
+                ps.Commands = this.commands;
                 ps.AddCommand( "out-default" );
                 ps.Commands.Commands[0].MergeMyResults( PipelineResultTypes.Error, PipelineResultTypes.Output );
-                ps.Invoke( new object[] { obj } );
-                return h.CreateReader();
+                ps.Invoke( new object[] { this.Input } );
+                return h.Output;
                 }
             }
         }
+
+    public static class PowerShellPipeLineEx
+        {
+        public static PowerShellPipeLine FormatTable(this PowerShellPipeLine pipeline, object[] Property = null, bool? AutoSize = null, bool? DisplayError = null, string Expand = null)
+            {
+            pipeline.AddCommand( "Format-Table" );
+            if (AutoSize != null)
+                pipeline.AddParameter("AutoSize");
+            return pipeline;
+            }
+        }
+
 
     internal class RawUserInterface : PSHostRawUserInterface
         {
@@ -294,6 +345,11 @@ namespace PowerShellFormat
         public override Version Version
             {
             get { return new Version(1, 0, 0, 0); }
+            }
+
+        public string Output
+            {
+            get { return this.output.ToString(); }
             }
 
         public override void EnterNestedPrompt()
